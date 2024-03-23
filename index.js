@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 require("dotenv").config();
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 3000;
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
@@ -18,6 +19,22 @@ const client = new MongoClient(uri, {
   },
 });
 
+function varifyJWT(req, res, next) {
+  // console.log(req.headers.authorization);
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+  const token = authHeader.split(" ")[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+    if (err) {
+      return res.status(401).send({ message: "unauthorized access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+}
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -27,6 +44,17 @@ async function run() {
     const serviceCollection = client.db("photographerDB").collection("service");
     const ReviewCollection = client.db("photographerDB").collection("reviews");
 
+    // jwt
+    app.post("/jwt", (req, res) => {
+      const user = req.body;
+      console.log(user);
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+      res.send({ token });
+    });
+
+    // service related api
     app.get("/services", async (req, res) => {
       let limit = parseInt(req.query.limit) || 3; // Default limit to 3 if not provided in query params
       const cursor = serviceCollection.find();
@@ -48,10 +76,21 @@ async function run() {
       const result = await serviceCollection.findOne(query);
       res.send(result);
     });
+    app.post("/services", async (req, res) => {
+      const service = req.body;
+      const result = await serviceCollection.insertOne(service);
+      res.send(result);
+    });
 
     // review related api
-    app.get("/reviews", async (req, res) => {
+    app.get("/reviews", varifyJWT, async (req, res) => {
       // console.log(req.query.email);
+      const decoded = req.decoded;
+      console.log("in my review", decoded);
+      if (decoded.email !== req.query.email) {
+        res.status(403).send({ message: "forbidden-access" });
+      }
+
       let query = {};
       if (req.query?.email) {
         query = { email: req.query.email };
