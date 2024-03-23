@@ -43,6 +43,9 @@ async function run() {
 
     const serviceCollection = client.db("photographerDB").collection("service");
     const ReviewCollection = client.db("photographerDB").collection("reviews");
+    const TestimonialCollection = client
+      .db("photographerDB")
+      .collection("testimonial");
 
     // jwt
     app.post("/jwt", (req, res) => {
@@ -98,15 +101,46 @@ async function run() {
       const result = await ReviewCollection.find(query).toArray();
       res.send(result);
     });
+
+    app.get("/reviews/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await ReviewCollection.findOne(query);
+      res.send(result);
+    });
     app.post("/reviews", async (req, res) => {
       const review = req.body;
       const result = await ReviewCollection.insertOne(review);
+      res.send(result);
+    });
+    app.put("/reviews/:id", async (req, res) => {
+      const id = req.params.id;
+      const review = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updateReview = {
+        $set: {
+          message: review.message,
+          rating: review.rating,
+        },
+      };
+      const result = await ReviewCollection.updateOne(
+        filter,
+        updateReview,
+        options
+      );
       res.send(result);
     });
     app.delete("/reviews/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await ReviewCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    //testimonial related api
+    app.get("/testimonial", async (req, res) => {
+      const result = await TestimonialCollection.find().toArray();
       res.send(result);
     });
 
